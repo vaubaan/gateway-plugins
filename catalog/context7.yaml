@@ -1,0 +1,7 @@
+# Declared by the gateway's own repository: the socle and the official plugins.
+id: context7
+repo: https://github.com/vaubaan/gateway
+path: plugins/context7
+version: 0.2.0
+commit: a053f03b0fda681e1b3cdb487c4b2c1bd7b22767
+owners: [vaubaan/maintainers]
