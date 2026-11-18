@@ -23,13 +23,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 26
-      - uses: sigstore/cosign-installer@v3
+      # Installer v4: cosign v3 ships its signature as a Sigstore bundle, which v3 cannot read.
+      - uses: sigstore/cosign-installer@v4
         with:
           cosign-release: v3.1.4
       - name: Declarations
