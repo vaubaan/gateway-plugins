@@ -12,3 +12,6 @@ owners: [acme-dev]       # GitHub users or org/teams who may change this file
 ```
 
 `node scripts/declarations.mjs check` reads them all.
+
+The official plugins, the ones an instance preinstalls among them, are declared here like any
+other: their source is `vaubaan/gateway`, under `plugins/<id>`, owned by `vaubaan/maintainers`.
