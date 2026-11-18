@@ -1,0 +1,61 @@
+# The catalog's release (ADR plugin-catalog-rebuilt-from-source; ADR
+# plugin-signature-sets-the-trust-level): every declaration of main whose version has no
+# release yet is rebuilt from its declared commit, its manifest signed keyless by this
+# workflow (Sigstore public-good: the certificate names this file on main), packed, and
+# published as the release `<id>-v<version>`. Only this workflow, on main, signs "Vaubaan".
+name: release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+      - uses: sigstore/cosign-installer@v3
+        with:
+          cosign-release: v3.1.4
+      - name: Declarations
+        run: node scripts/declarations.mjs check
+      - name: Build, sign and publish what has no release yet
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          work="$RUNNER_TEMP/work"
+          for file in catalog/*.yaml; do
+            id="$(basename "$file" .yaml)"
+            version="$(node -e "process.stdout.write(JSON.parse(process.argv[1]).version)" "$(node scripts/declarations.mjs json "$id")")"
+            tag="$id-v$version"
+            if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then continue; fi
+            bash scripts/build.sh "$id" "$work" > /dev/null
+            dir="$work/out/$id"
+            cosign sign-blob --yes \
+              --bundle "$dir/vaubaan-manifest.json.sigstore.json" \
+              "$dir/vaubaan-manifest.json"
+            node "$work/toolchain/packages/plugin-cli/src/cli.ts" pack "$dir" --out "$work/$tag.tgz"
+            sha="$(sha256sum "$work/$tag.tgz" | cut -d' ' -f1)"
+            gh release create "$tag" "$work/$tag.tgz" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "$id $version" \
+              --notes "Built from $(node -e "const d=JSON.parse(process.argv[1]); process.stdout.write(d.repo + ' at ' + d.commit + ' (' + d.path + ')')" "$(node scripts/declarations.mjs json "$id")"), signed by the catalog's release workflow. sha256 of the archive: \`$sha\`."
+            echo "published $tag ($sha)"
+          done

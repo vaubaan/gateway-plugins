@@ -1,0 +1,44 @@
+# A pull request on the catalog (ADR plugin-catalog-rebuilt-from-source): the declarations
+# are checked, and every declaration it adds or changes is rebuilt from its declared commit
+# with the catalog's toolchain. This workflow holds no secret and signs nothing; what the
+# review reads is in the job summary.
+name: check
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+      - name: Declarations
+        run: node scripts/declarations.mjs check
+      - name: Rebuild what the pull request declares
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          ids="$(node scripts/declarations.mjs changed "$BASE")"
+          echo "## What this pull request declares" >> "$GITHUB_STEP_SUMMARY"
+          if [ -z "$ids" ]; then echo "No declaration changed." >> "$GITHUB_STEP_SUMMARY"; fi
+          for id in $ids; do
+            [ -f "catalog/$id.yaml" ] || { echo "- \`$id\`: removed from the catalog" >> "$GITHUB_STEP_SUMMARY"; continue; }
+            bash scripts/build.sh "$id" "$RUNNER_TEMP/work" > "$RUNNER_TEMP/$id.manifest.json"
+            bash scripts/report.sh "$id" "$RUNNER_TEMP/work" "$BASE" >> "$GITHUB_STEP_SUMMARY"
+          done
