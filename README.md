@@ -14,6 +14,11 @@ source repository, the exact commit and its version. This repository holds no pl
   repository on `main`), packs the archive and publishes it as the release `<id>-v<version>`. That
   signature is what a gateway shows as "signed by Vaubaan": built by this workflow from a reviewed
   commit. An archive submitted by its author is never signed here.
+- **Building never holds the signature.** Building a plugin runs its code (its bundle is imported
+  to check it), so `release` builds each plugin in a job of its own with a read-only token and no
+  OIDC token. The job that signs runs no plugin code: it checks each built folder against its
+  declaration and its manifest (`scripts/verify-built.mjs`: the declared id and version, every
+  file listed with its sha256, nothing else beside them) before it signs and publishes.
 
 Decisions: [plugin-catalog-rebuilt-from-source](https://github.com/vaubaan/gateway/blob/main/docs/decisions/plugin-catalog-rebuilt-from-source.md),
 [plugin-signature-sets-the-trust-level](https://github.com/vaubaan/gateway/blob/main/docs/decisions/plugin-signature-sets-the-trust-level.md).

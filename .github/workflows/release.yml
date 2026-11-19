@@ -3,6 +3,12 @@
 # release yet is rebuilt from its declared commit, its manifest signed keyless by this
 # workflow (Sigstore public-good: the certificate names this file on main), packed, and
 # published as the release `<id>-v<version>`. Only this workflow, on main, signs "Vaubaan".
+#
+# Building runs the plugin's code (its bundle is imported to smoke-test it), so it never
+# shares a job with the signing identity: `plan` lists what has no release, `build` builds
+# each plugin in a job of its own with a read-only token and no OIDC token, and `publish`
+# holds the identity but runs no plugin code. It checks every built folder against its
+# declaration and its manifest (scripts/verify-built.mjs) before signing anything.
 name: release
 
 on:
@@ -10,23 +16,92 @@ on:
     branches: [main]
   workflow_dispatch:
 
-permissions:
-  contents: write
-  id-token: write
+permissions: {}
 
 concurrency:
   group: release
   cancel-in-progress: false
 
 jobs:
-  release:
+  plan:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      ids: ${{ steps.pending.outputs.ids }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26
+      - name: Declarations
+        run: node scripts/declarations.mjs check
+      - name: What has no release yet
+        id: pending
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          ids=()
+          for file in catalog/*.yaml; do
+            id="$(basename "$file" .yaml)"
+            version="$(node -e "process.stdout.write(JSON.parse(process.argv[1]).version)" "$(node scripts/declarations.mjs json "$id")")"
+            if gh release view "$id-v$version" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then continue; fi
+            ids+=("$id")
+          done
+          echo "ids=$(node -e 'process.stdout.write(JSON.stringify(process.argv.slice(1)))' "${ids[@]}")" >> "$GITHUB_OUTPUT"
+          echo "to release: ${ids[*]:-nothing}"
+
+  # One job per plugin: a plugin's code never sees another plugin's output, nor a token that
+  # writes anything but its own artifact.
+  build:
+    needs: plan
+    if: needs.plan.outputs.ids != '[]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: true
+      matrix:
+        id: ${{ fromJSON(needs.plan.outputs.ids) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26
+      - name: Build
+        env:
+          ID: ${{ matrix.id }}
+        run: bash scripts/build.sh "$ID" "$RUNNER_TEMP/work"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: built-${{ matrix.id }}
+          path: ${{ runner.temp }}/work/out/${{ matrix.id }}/
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 1
+
+  # Holds the signing identity: no plugin code runs here, only this repository's scripts and
+  # the toolchain's `pack`, which reads files and never imports them.
+  publish:
+    needs: [plan, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 26
       # cosign, pinned, from its release, checked against its published checksums.
@@ -42,30 +117,43 @@ jobs:
           sudo install -m 0755 cosign-linux-amd64 /usr/local/bin/cosign
           rm cosign-linux-amd64 cosign_checksums.txt
           cosign version
-      - name: Declarations
-        run: node scripts/declarations.mjs check
-      - name: Build, sign and publish what has no release yet
-        env:
-          GH_TOKEN: ${{ github.token }}
+      # The toolchain (the reviewed gateway commit of toolchain.json), its dependencies from
+      # its lockfile with no install script.
+      - name: Toolchain
         run: |
           set -euo pipefail
-          shopt -s nullglob
-          work="$RUNNER_TEMP/work"
-          for file in catalog/*.yaml; do
-            id="$(basename "$file" .yaml)"
-            version="$(node -e "process.stdout.write(JSON.parse(process.argv[1]).version)" "$(node scripts/declarations.mjs json "$id")")"
+          tool_repo="$(node -e "process.stdout.write(require('./toolchain.json').repo)")"
+          tool_commit="$(node -e "process.stdout.write(require('./toolchain.json').commit)")"
+          dir="$RUNNER_TEMP/toolchain"
+          git init -q "$dir"
+          git -C "$dir" fetch -q --depth 1 "$tool_repo" "$tool_commit"
+          git -C "$dir" checkout -q FETCH_HEAD
+          test "$(git -C "$dir" rev-parse HEAD)" = "$tool_commit"
+          (cd "$dir" && npm ci --ignore-scripts --no-audit --no-fund)
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: built-*
+          path: ${{ runner.temp }}/built
+      - name: Check, sign and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IDS: ${{ needs.plan.outputs.ids }}
+        run: |
+          set -euo pipefail
+          for id in $(node -e 'process.stdout.write(JSON.parse(process.argv[1]).join(" "))' "$IDS"); do
+            decl="$(node scripts/declarations.mjs json "$id")"
+            version="$(node -e "process.stdout.write(JSON.parse(process.argv[1]).version)" "$decl")"
             tag="$id-v$version"
-            if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then continue; fi
-            bash scripts/build.sh "$id" "$work" > /dev/null
-            dir="$work/out/$id"
+            dir="$RUNNER_TEMP/built/built-$id"
+            node scripts/verify-built.mjs "$dir" "$id" "$version"
             cosign sign-blob --yes \
               --bundle "$dir/vaubaan-manifest.json.sigstore.json" \
               "$dir/vaubaan-manifest.json"
-            node "$work/toolchain/packages/plugin-cli/src/cli.ts" pack "$dir" --out "$work/$tag.tgz"
-            sha="$(sha256sum "$work/$tag.tgz" | cut -d' ' -f1)"
-            gh release create "$tag" "$work/$tag.tgz" \
+            node "$RUNNER_TEMP/toolchain/packages/plugin-cli/src/cli.ts" pack "$dir" --out "$RUNNER_TEMP/$tag.tgz"
+            sha="$(sha256sum "$RUNNER_TEMP/$tag.tgz" | cut -d' ' -f1)"
+            gh release create "$tag" "$RUNNER_TEMP/$tag.tgz" \
               --repo "$GITHUB_REPOSITORY" \
               --title "$id $version" \
-              --notes "Built from $(node -e "const d=JSON.parse(process.argv[1]); process.stdout.write(d.repo + ' at ' + d.commit + ' (' + d.path + ')')" "$(node scripts/declarations.mjs json "$id")"), signed by the catalog's release workflow. sha256 of the archive: \`$sha\`."
+              --notes "Built from $(node -e "const d=JSON.parse(process.argv[1]); process.stdout.write(d.repo + ' at ' + d.commit + ' (' + d.path + ')')" "$decl"), signed by the catalog's release workflow. sha256 of the archive: \`$sha\`."
             echo "published $tag ($sha)"
           done
