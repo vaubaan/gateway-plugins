@@ -2,6 +2,6 @@
 id: github
 repo: https://github.com/vaubaan/gateway
 path: plugins/github
-version: 5.3.1
-commit: 7a421b25fa40a89e64c2e8d2de8df9e21321887b
+version: 5.4.0
+commit: bf7c0e0c85ca075c3754b1fb6ecd52330bafd6e3
 owners: [vaubaan/maintainers]
