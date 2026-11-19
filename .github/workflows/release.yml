@@ -130,10 +130,27 @@ jobs:
           git -C "$dir" checkout -q FETCH_HEAD
           test "$(git -C "$dir" rev-parse HEAD)" = "$tool_commit"
           (cd "$dir" && npm ci --ignore-scripts --no-audit --no-fund)
+      # Each built folder in a directory of its own, whatever their number: a pattern that
+      # matches a single artifact extracts it into `path` itself, not into a subdirectory.
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: built-*
           path: ${{ runner.temp }}/built
+          merge-multiple: false
+      - name: One directory per built plugin
+        env:
+          IDS: ${{ needs.plan.outputs.ids }}
+        run: |
+          set -euo pipefail
+          built="$RUNNER_TEMP/built"
+          if [ -f "$built/vaubaan-manifest.json" ]; then
+            id="$(node -e 'const ids = JSON.parse(process.argv[1]); if (ids.length !== 1) process.exit(1); process.stdout.write(ids[0])' "$IDS")"
+            tmp="$(mktemp -d)"
+            mv "$built"/* "$built"/.[!.]* "$tmp"/ 2>/dev/null || true
+            mkdir -p "$built/built-$id"
+            mv "$tmp"/* "$tmp"/.[!.]* "$built/built-$id"/ 2>/dev/null || true
+          fi
+          ls "$built"
       - name: Check, sign and publish
         env:
           GH_TOKEN: ${{ github.token }}
