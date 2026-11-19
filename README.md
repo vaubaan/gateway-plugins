@@ -19,6 +19,10 @@ source repository, the exact commit and its version. This repository holds no pl
   OIDC token. The job that signs runs no plugin code: it checks each built folder against its
   declaration and its manifest (`scripts/verify-built.mjs`: the declared id and version, every
   file listed with its sha256, nothing else beside them) before it signs and publishes.
+- **After each release**, `index` publishes `index.json` on this repository's GitHub Pages
+  (<https://vaubaan.github.io/gateway-plugins/index.json>): every declared plugin, its service's
+  name, its version and the sha256 of its archive. Gateways read it to offer new versions; it is
+  not trusted, an archive is kept only once its signature verifies.
 
 Decisions: [plugin-catalog-rebuilt-from-source](https://github.com/vaubaan/gateway/blob/main/docs/decisions/plugin-catalog-rebuilt-from-source.md),
 [plugin-signature-sets-the-trust-level](https://github.com/vaubaan/gateway/blob/main/docs/decisions/plugin-signature-sets-the-trust-level.md).

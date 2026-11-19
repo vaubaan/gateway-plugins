@@ -2,11 +2,14 @@
 //
 //   node scripts/declarations.mjs check            every declaration, exit 1 on a problem
 //   node scripts/declarations.mjs json <id>        one declaration as JSON (for the workflows)
-//   node scripts/declarations.mjs changed <base>   the ids whose declaration changed since <base>
+//   node scripts/declarations.mjs changed <base>   the ids whose build changed since <base>
+//   node scripts/declarations.mjs index <digests>  the catalog's index.json, from every declaration
+//                                                  and <digests>, one "<id> <sha256>" per line
 //
 // A declaration is flat YAML, one `key: value` per line, `owners` a flow list:
 //
 //   id: crm
+//   name: Acme CRM                (the service's name, shown before the plugin is installed)
 //   repo: https://github.com/acme/vaubaan-plugin-crm
 //   path: .                       (optional: the plugin's folder in the repository)
 //   version: 0.2.0
@@ -17,8 +20,8 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const CATALOG = 'catalog';
-const KEYS = ['id', 'repo', 'path', 'version', 'commit', 'owners'];
-const REQUIRED = ['id', 'repo', 'version', 'commit', 'owners'];
+const KEYS = ['id', 'name', 'repo', 'path', 'version', 'commit', 'owners'];
+const REQUIRED = ['id', 'name', 'repo', 'version', 'commit', 'owners'];
 
 /** The problems of a declaration's text, and the declaration. Pure. */
 export function readDeclaration(text, file) {
@@ -48,6 +51,9 @@ export function readDeclaration(text, file) {
   for (const key of REQUIRED) if (!(key in decl)) problems.push(`${file}: no ${key}`);
   if (decl.id !== undefined && !/^[a-z][a-z0-9-]*$/.test(decl.id)) {
     problems.push(`${file}: id must be a lowercase slug`);
+  }
+  if (decl.name !== undefined && (decl.name.trim() === '' || decl.name.length > 80)) {
+    problems.push(`${file}: name must be 1 to 80 characters`);
   }
   if (decl.id !== undefined && file !== `${decl.id}.yaml`) {
     problems.push(`${file}: the file is named after its id (${decl.id}.yaml)`);
@@ -102,17 +108,73 @@ function main(argv) {
     return 0;
   }
   if (command === 'changed') {
+    // A declaration whose build changed: added, removed, or another repo, path, version or
+    // commit. Its name or owners alone change no archive, so nothing is rebuilt for them.
     const out = execFileSync('git', ['diff', '--name-only', `${arg}...HEAD`, '--', CATALOG], {
       encoding: 'utf8',
     });
+    const base = execFileSync('git', ['merge-base', arg, 'HEAD'], { encoding: 'utf8' }).trim();
+    const built = (text, file) => {
+      if (text === null) return null;
+      const { declaration } = readDeclaration(text, file);
+      return JSON.stringify([declaration.repo, declaration.path, declaration.version, declaration.commit]);
+    };
     const ids = out
       .split('\n')
       .filter((path) => path.endsWith('.yaml'))
+      .filter((path) => {
+        const file = path.slice(CATALOG.length + 1);
+        let before = null;
+        try {
+          before = execFileSync('git', ['show', `${base}:${path}`], {
+            encoding: 'utf8',
+            stdio: ['ignore', 'pipe', 'ignore'],
+          });
+        } catch {
+          before = null;
+        }
+        let now = null;
+        try {
+          now = readFileSync(path, 'utf8');
+        } catch {
+          now = null;
+        }
+        return built(before, file) !== built(now, file);
+      })
       .map((path) => path.slice(CATALOG.length + 1, -'.yaml'.length));
     console.log(ids.join('\n'));
     return 0;
   }
-  console.error('usage: node scripts/declarations.mjs check | json <id> | changed <base>');
+  if (command === 'index') {
+    // The index an instance reads (ADR plugin-catalog-rebuilt-from-source, amendment
+    // 2026-11-19): every declaration, at its declared version, with its archive's sha256.
+    const digests = new Map(
+      readFileSync(arg, 'utf8')
+        .split('\n')
+        .filter((line) => line.trim() !== '')
+        .map((line) => line.trim().split(/\s+/)),
+    );
+    const all = allDeclarations();
+    const problems = all.flatMap((d) => d.problems);
+    const plugins = {};
+    for (const { declaration } of all) {
+      const sha256 = digests.get(declaration.id);
+      if (!/^[0-9a-f]{64}$/.test(sha256 ?? '')) {
+        problems.push(`${declaration.id}: no sha256 for ${declaration.version}`);
+        continue;
+      }
+      plugins[declaration.id] = { name: declaration.name, version: declaration.version, sha256 };
+    }
+    if (problems.length > 0) {
+      for (const problem of problems) console.error(problem);
+      return 1;
+    }
+    console.log(
+      JSON.stringify({ schema: 1, generated_at: new Date().toISOString(), plugins }, null, 2),
+    );
+    return 0;
+  }
+  console.error('usage: node scripts/declarations.mjs check | json <id> | changed <base> | index <digests>');
   return 2;
 }
 

@@ -1,0 +1,70 @@
+# The catalog's index (ADR plugin-catalog-rebuilt-from-source, amendment 2026-11-19):
+# after each release, `index.json` on this repository's GitHub Pages names every declared
+# plugin, its service's name, its version and the sha256 of its archive. Instances read it
+# at their versions check; a gateway release copies it (`npm run release:prepare`).
+#
+# A workflow of its own, never a job of release.yml: deploying to Pages needs an OIDC token,
+# and a certificate minted here names this file, never the one an instance trusts to sign
+# "Vaubaan". It runs no plugin code: it reads the declarations and the published archives.
+# The index is not trusted by instances: an archive is kept only once its signature verifies.
+name: index
+
+on:
+  workflow_run:
+    workflows: [release]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  index:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26
+      - name: Digests of the published archives
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          : > "$RUNNER_TEMP/digests.txt"
+          for file in catalog/*.yaml; do
+            id="$(basename "$file" .yaml)"
+            version="$(node -e "process.stdout.write(JSON.parse(process.argv[1]).version)" "$(node scripts/declarations.mjs json "$id")")"
+            tag="$id-v$version"
+            gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern "$tag.tgz" --dir "$RUNNER_TEMP/assets" --clobber
+            echo "$id $(sha256sum "$RUNNER_TEMP/assets/$tag.tgz" | cut -d' ' -f1)" >> "$RUNNER_TEMP/digests.txt"
+          done
+      - name: index.json
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/site"
+          node scripts/declarations.mjs index "$RUNNER_TEMP/digests.txt" > "$RUNNER_TEMP/site/index.json"
+          cat "$RUNNER_TEMP/site/index.json"
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: ${{ runner.temp }}/site
+      - id: deploy
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

@@ -1,5 +1,6 @@
 # Declared by the gateway's own repository: the socle and the official plugins.
 id: github
+name: GitHub
 repo: https://github.com/vaubaan/gateway
 path: plugins/github
 version: 5.3.1
