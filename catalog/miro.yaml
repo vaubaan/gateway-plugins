@@ -2,6 +2,6 @@
 id: miro
 repo: https://github.com/vaubaan/gateway
 path: plugins/miro
-version: 0.5.0
-commit: a053f03b0fda681e1b3cdb487c4b2c1bd7b22767
+version: 0.5.1
+commit: f78d98c4c87abc4fbeea6b0bf1ebba80397666b4
 owners: [vaubaan/maintainers]
