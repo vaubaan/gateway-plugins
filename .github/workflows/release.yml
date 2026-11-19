@@ -140,7 +140,16 @@ jobs:
           IDS: ${{ needs.plan.outputs.ids }}
         run: |
           set -euo pipefail
-          for id in $(node -e 'process.stdout.write(JSON.parse(process.argv[1]).join(" "))' "$IDS"); do
+          ids="$(node -e 'process.stdout.write(JSON.parse(process.argv[1]).join(" "))' "$IDS")"
+          # download-artifact extracts several matching artifacts into built/<name>, but a
+          # lone one into built/ itself: give it the same layout.
+          set -- $ids
+          if [ "$#" -eq 1 ] && [ ! -d "$RUNNER_TEMP/built/built-$1" ]; then
+            mv "$RUNNER_TEMP/built" "$RUNNER_TEMP/built-$1"
+            mkdir "$RUNNER_TEMP/built"
+            mv "$RUNNER_TEMP/built-$1" "$RUNNER_TEMP/built/built-$1"
+          fi
+          for id in $ids; do
             decl="$(node scripts/declarations.mjs json "$id")"
             version="$(node -e "process.stdout.write(JSON.parse(process.argv[1]).version)" "$decl")"
             tag="$id-v$version"
