@@ -3,6 +3,6 @@ id: miro
 name: Miro
 repo: https://github.com/vaubaan/gateway
 path: plugins/miro
-version: 0.5.1
-commit: f78d98c4c87abc4fbeea6b0bf1ebba80397666b4
+version: 0.5.2
+commit: 21b4bd3f7f4f78b2a04349dc297e2f61ebd8d14c
 owners: [vaubaan/maintainers]

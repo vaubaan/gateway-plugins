@@ -3,6 +3,6 @@ id: stripe
 name: Stripe
 repo: https://github.com/vaubaan/gateway
 path: plugins/stripe
-version: 0.5.0
-commit: a053f03b0fda681e1b3cdb487c4b2c1bd7b22767
+version: 0.5.1
+commit: 21b4bd3f7f4f78b2a04349dc297e2f61ebd8d14c
 owners: [vaubaan/maintainers]
