@@ -3,6 +3,6 @@ id: vercel
 name: Vercel
 repo: https://github.com/vaubaan/gateway
 path: plugins/vercel
-version: 4.2.2
-commit: 533fd6d81f9d1d07d4a1e85eec429f0a19a2ccb8
+version: 4.2.3
+commit: 21b4bd3f7f4f78b2a04349dc297e2f61ebd8d14c
 owners: [vaubaan/maintainers]
