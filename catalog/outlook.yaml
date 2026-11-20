@@ -1,5 +1,6 @@
 # Declared by the gateway's own repository: the socle and the official plugins.
 id: outlook
+name: Outlook
 repo: https://github.com/vaubaan/gateway
 path: plugins/outlook
 version: 0.1.0

@@ -1,5 +1,6 @@
 # Declared by the gateway's own repository: the socle and the official plugins.
 id: fly
+name: Fly.io
 repo: https://github.com/vaubaan/gateway
 path: plugins/fly
 version: 0.4.0

@@ -1,5 +1,6 @@
 # Declared by the gateway's own repository: the socle and the official plugins.
 id: gmail
+name: Gmail
 repo: https://github.com/vaubaan/gateway
 path: plugins/gmail
 version: 2.0.0

@@ -1,5 +1,6 @@
 # Declared by the gateway's own repository: the socle and the official plugins.
 id: cloudflare-dns
+name: Cloudflare DNS
 repo: https://github.com/vaubaan/gateway
 path: plugins/cloudflare-dns
 version: 4.0.0

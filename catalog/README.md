@@ -4,6 +4,7 @@ One file per plugin, `<id>.yaml`, named after its id:
 
 ```yaml
 id: crm
+name: Acme CRM           # the service's name, shown before the plugin is installed
 repo: https://github.com/acme/vaubaan-plugin-crm
 path: .                  # the plugin's folder in that repository (default: the root)
 version: 0.2.0
