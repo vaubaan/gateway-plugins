@@ -39,3 +39,7 @@ Decisions: [plugin-catalog-rebuilt-from-source](https://github.com/vaubaan/gatew
 - A declaration is changed only by the owners it names (`CODEOWNERS`).
 - The repository stays public: the public Sigstore log does not serve a private one.
 - `toolchain.json` moves only by a reviewed pull request.
+- `toolchain.json` moves **before** the declarations that need its CLI: the toolchain writes what an
+  archive declares (the SDK range in its `package.json`), whatever the declared commit says. A
+  plugin built with SDK 1.0 by an older toolchain declared `^1.0.0`, which a gateway on SDK 0.9.4
+  refuses; the toolchain's CLI must run under plain Node (`plain-node.test.ts` in the gateway).
