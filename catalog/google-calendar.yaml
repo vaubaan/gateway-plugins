@@ -3,6 +3,6 @@ id: google-calendar
 name: Google Calendar
 repo: https://github.com/vaubaan/gateway
 path: plugins/google-calendar
-version: 0.4.1
-commit: 21b4bd3f7f4f78b2a04349dc297e2f61ebd8d14c
+version: 0.4.2
+commit: 80ff99cd4229d0720f137d15dff5c28079fafb2a
 owners: [vaubaan/maintainers]
