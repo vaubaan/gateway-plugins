@@ -3,6 +3,6 @@ id: github
 name: GitHub
 repo: https://github.com/vaubaan/gateway
 path: plugins/github
-version: 5.4.0
-commit: bf7c0e0c85ca075c3754b1fb6ecd52330bafd6e3
+version: 5.4.1
+commit: 0e5f11b69ef9a6f516854484593e3938e5654145
 owners: [vaubaan/maintainers]
