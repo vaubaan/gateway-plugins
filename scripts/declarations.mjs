@@ -3,7 +3,8 @@
 //   node scripts/declarations.mjs check            every declaration, exit 1 on a problem
 //   node scripts/declarations.mjs json <id>        one declaration as JSON (for the workflows)
 //   node scripts/declarations.mjs changed <base>   the ids whose build changed since <base>
-//   node scripts/declarations.mjs index <digests>  the catalog's index.json, from every declaration
+//   node scripts/declarations.mjs index <digests> [<manifests>]
+//                                                  the catalog's index.json, from every declaration
 //                                                  and <digests>, one "<id> <sha256>" per line
 //
 // A declaration is flat YAML, one `key: value` per line, `owners` a flow list:
@@ -82,6 +83,30 @@ export function readDeclaration(text, file) {
   return { problems, declaration: { path: '.', ...decl } };
 }
 
+/**
+ * The service's mark an archive's manifest declares (`icon`, `iconColor`, written by
+ * vaubaan-plugin build from the plugin; ADR service-icons-declared-by-the-plugin of the
+ * gateway, amendment 2026-11-26), read as data: kept only as definePlugin accepts it, and
+ * nothing for a manifest that is missing, unreadable or declares none (an archive built
+ * before). Never throws.
+ */
+export function markOf(manifestFile) {
+  let manifest;
+  try {
+    manifest = JSON.parse(readFileSync(manifestFile, 'utf8'));
+  } catch {
+    return {};
+  }
+  const icon = manifest?.icon;
+  if (typeof icon !== 'string' || icon.length > 8192 || !/^[Mm][0-9A-Za-z.,\s+-]*$/.test(icon)) {
+    return {};
+  }
+  const color = manifest.iconColor;
+  return typeof color === 'string' && /^#[0-9A-Fa-f]{6}$/.test(color)
+    ? { icon, iconColor: color }
+    : { icon };
+}
+
 export function allDeclarations(dir = CATALOG) {
   return readdirSync(dir)
     .filter((name) => name.endsWith('.yaml'))
@@ -146,6 +171,7 @@ function main(argv) {
     return 0;
   }
   if (command === 'index') {
+    const manifests = argv[2];
     // The index an instance reads (ADR plugin-catalog-rebuilt-from-source, amendment
     // 2026-11-19): every declaration, at its declared version, with its archive's sha256.
     const digests = new Map(
@@ -163,7 +189,12 @@ function main(argv) {
         problems.push(`${declaration.id}: no sha256 for ${declaration.version}`);
         continue;
       }
-      plugins[declaration.id] = { name: declaration.name, version: declaration.version, sha256 };
+      plugins[declaration.id] = {
+        name: declaration.name,
+        version: declaration.version,
+        sha256,
+        ...(manifests === undefined ? {} : markOf(join(manifests, `${declaration.id}.json`))),
+      };
     }
     if (problems.length > 0) {
       for (const problem of problems) console.error(problem);
@@ -174,7 +205,9 @@ function main(argv) {
     );
     return 0;
   }
-  console.error('usage: node scripts/declarations.mjs check | json <id> | changed <base> | index <digests>');
+  console.error(
+    'usage: node scripts/declarations.mjs check | json <id> | changed <base> | index <digests> [<manifests>]',
+  );
   return 2;
 }
 

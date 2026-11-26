@@ -1,7 +1,8 @@
 # The catalog's index (ADR plugin-catalog-rebuilt-from-source, amendment 2026-11-19):
 # after each release, `index.json` on this repository's GitHub Pages names every declared
-# plugin, its service's name, its version and the sha256 of its archive. Instances read it
-# at their versions check; a gateway release copies it (`npm run release:prepare`).
+# plugin, its service's name, its version, the sha256 of its archive and the icon its archive's
+# manifest declares. Instances read it at their versions check; a gateway release copies it
+# (`npm run release:prepare`).
 #
 # A workflow of its own, never a job of release.yml: deploying to Pages needs an OIDC token,
 # and a certificate minted here names this file, never the one an instance trusts to sign
@@ -49,18 +50,21 @@ jobs:
           set -euo pipefail
           shopt -s nullglob
           : > "$RUNNER_TEMP/digests.txt"
+          mkdir -p "$RUNNER_TEMP/manifests"
           for file in catalog/*.yaml; do
             id="$(basename "$file" .yaml)"
             version="$(node -e "process.stdout.write(JSON.parse(process.argv[1]).version)" "$(node scripts/declarations.mjs json "$id")")"
             tag="$id-v$version"
             gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern "$tag.tgz" --dir "$RUNNER_TEMP/assets" --clobber
             echo "$id $(sha256sum "$RUNNER_TEMP/assets/$tag.tgz" | cut -d' ' -f1)" >> "$RUNNER_TEMP/digests.txt"
+            # Its manifest, read as data for the service's mark: one member, to stdout, never extracted.
+            tar -xzOf "$RUNNER_TEMP/assets/$tag.tgz" vaubaan-manifest.json > "$RUNNER_TEMP/manifests/$id.json"
           done
       - name: index.json
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/site"
-          node scripts/declarations.mjs index "$RUNNER_TEMP/digests.txt" > "$RUNNER_TEMP/site/index.json"
+          node scripts/declarations.mjs index "$RUNNER_TEMP/digests.txt" "$RUNNER_TEMP/manifests" > "$RUNNER_TEMP/site/index.json"
           cat "$RUNNER_TEMP/site/index.json"
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
