@@ -4,5 +4,5 @@ name: Supabase
 repo: https://github.com/vaubaan/gateway
 path: plugins/supabase
 version: 6.4.0
-commit: 293bf3ae
+commit: 293bf3aec2cc1051f16cd8a653537fd9fa53d054
 owners: [vaubaan/maintainers]
