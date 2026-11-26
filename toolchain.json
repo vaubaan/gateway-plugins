@@ -1,5 +1,5 @@
 {
   "//": "The gateway commit whose vaubaan-plugin builds and packs every plugin of the catalog. Moved by a reviewed pull request, never by a declaration.",
   "repo": "https://github.com/vaubaan/gateway",
-  "commit": "51d4fa1ee085598106ffd0dc3915221df940cd57"
+  "commit": "bca396f81476711d7419899d2b8ce9f1f37133a3"
 }

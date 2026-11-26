@@ -3,6 +3,6 @@ id: outlook
 name: Outlook
 repo: https://github.com/vaubaan/gateway
 path: plugins/outlook
-version: 0.1.2
-commit: 80ff99cd4229d0720f137d15dff5c28079fafb2a
+version: 0.1.3
+commit: bca396f81476711d7419899d2b8ce9f1f37133a3
 owners: [vaubaan/maintainers]
