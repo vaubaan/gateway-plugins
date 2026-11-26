@@ -3,6 +3,6 @@ id: supabase
 name: Supabase
 repo: https://github.com/vaubaan/gateway
 path: plugins/supabase
-version: 6.3.0
-commit: c5c16cb85604856ce71e686376040b60be92b8b4
+version: 6.4.0
+commit: 293bf3aec2cc1051f16cd8a653537fd9fa53d054
 owners: [vaubaan/maintainers]
