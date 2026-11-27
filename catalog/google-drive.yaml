@@ -1,0 +1,8 @@
+# Declared by the gateway's own repository: the socle and the official plugins.
+id: google-drive
+name: Google Drive
+repo: https://github.com/vaubaan/gateway
+path: plugins/google-drive
+version: 0.1.0
+commit: 770077dc1558705d5523da19a5fc4d455f3be544
+owners: [vaubaan/maintainers]
