@@ -3,6 +3,6 @@ id: railway
 name: Railway
 repo: https://github.com/vaubaan/gateway
 path: plugins/railway
-version: 6.1.0
-commit: 66260276ee6f75f5db42ea5cc4417de79324f386
+version: 6.1.1
+commit: bca396f81476711d7419899d2b8ce9f1f37133a3
 owners: [vaubaan/maintainers]

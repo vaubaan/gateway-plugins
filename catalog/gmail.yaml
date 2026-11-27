@@ -3,6 +3,6 @@ id: gmail
 name: Gmail
 repo: https://github.com/vaubaan/gateway
 path: plugins/gmail
-version: 2.0.0
-commit: a053f03b0fda681e1b3cdb487c4b2c1bd7b22767
+version: 2.0.1
+commit: bca396f81476711d7419899d2b8ce9f1f37133a3
 owners: [vaubaan/maintainers]
